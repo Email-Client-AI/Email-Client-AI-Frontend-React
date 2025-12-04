@@ -2,10 +2,9 @@ import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
 
 export interface User {
-  name: string;
+  id: string;
   email: string;
-  picture: string;
-  sub: string; // Google unique ID
+  name: string;
 }
 
 interface AuthContextType {
@@ -17,9 +16,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(
-    JSON.parse(localStorage.getItem("user") || "null")
-  );
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Failed to parse user from local storage", error);
+      return null;
+    }
+  });
 
   const login = (userObj: User) => {
     setUser(userObj);

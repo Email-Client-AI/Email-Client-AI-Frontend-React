@@ -1,19 +1,15 @@
 import React from 'react';
+import type { Email } from '../types/email';
+import { formatReceivedDate } from '../services/email-services';
 
 interface SidebarItemProps {
-  name: string;
-  time: string;
-  subject: string;
-  snippet: string;
+  email: Email;
   active: boolean;
   onClick: () => void;
 }
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ 
-  name, 
-  time, 
-  subject, 
-  snippet, 
+  email, 
   active, 
   onClick 
 }) => {
@@ -30,17 +26,17 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
         <div className="flex-1 overflow-hidden">
           <div className="flex items-baseline justify-between">
             <p className={`truncate font-semibold ${active ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"}`}>
-              {name}
+              {email.senderEmail}
             </p>
             <p className={`text-xs ${active ? "font-medium text-primary" : "text-gray-500 dark:text-gray-400"}`}>
-              {time}
+              {formatReceivedDate(email.receivedDate)}
             </p>
           </div>
           <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {subject}
+            {email.subject}
           </p>
           <p className="truncate text-sm text-gray-600 dark:text-gray-400">
-            {snippet}
+            {email.snippet}
           </p>
         </div>
       </div>

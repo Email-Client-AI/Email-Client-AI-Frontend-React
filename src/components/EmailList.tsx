@@ -1,21 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import SidebarItem from './SideBarItem';
+import type { Email } from '../types/email';
 
-interface Email {
-  id: number;
-  name: string;
-  time: string;
-  subject: string;
-  snippet: string;
-}
 
 interface EmailListProps {
   emails: Email[];
-  activeEmail: number;
-  onEmailSelect: (id: number) => void;
+  activeEmailId: string;
+  onEmailSelect: (id: string) => void;
 }
 
-const EmailList: React.FC<EmailListProps> = ({ emails, activeEmail, onEmailSelect }) => {
+const EmailList: React.FC<EmailListProps> = ({ emails, activeEmailId, onEmailSelect }) => {
   return (
     <aside className="w-96 shrink-0 overflow-y-auto border-r border-gray-200 bg-background-light dark:border-gray-800 dark:bg-background-dark">
       <div className="flex items-center justify-between p-4">
@@ -28,8 +22,8 @@ const EmailList: React.FC<EmailListProps> = ({ emails, activeEmail, onEmailSelec
         {emails.map((email) => (
           <SidebarItem
             key={email.id}
-            {...email}
-            active={activeEmail === email.id}
+            email={email}
+            active={activeEmailId === email.id}
             onClick={() => onEmailSelect(email.id)}
           />
         ))}
