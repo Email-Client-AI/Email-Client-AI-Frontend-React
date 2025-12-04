@@ -31,17 +31,17 @@ export default function Login() {
       }
 
       const data = await res.json();
-      
+
       // Expected response: { accessToken: string, user: { id, email, name } }
       if (data.accessToken) {
         saveAccessToken(data.accessToken);
       }
-      
+
       if (data.user) {
         login(data.user);
       }
 
-      navigate("/dashboard");
+      navigate("/dashboard#inbox");
 
     } catch (err: any) {
       console.error("Failed to login:", err);
@@ -56,8 +56,8 @@ export default function Login() {
     scope: googleScopes,
     onSuccess: handleSuccess,
     onError: errorResponse => {
-        console.error("Google Login Error:", errorResponse);
-        setError("Google login failed. Please try again.");
+      console.error("Google Login Error:", errorResponse);
+      setError("Google login failed. Please try again.");
     },
   });
 
@@ -72,7 +72,7 @@ export default function Login() {
             Welcome back! Please sign in to continue.
           </p>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
             <div className="flex">

@@ -1,6 +1,17 @@
 import React from 'react';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  activeCategory: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
+  const categories = [
+    { id: "inbox", label: "Inbox" },
+    { id: "sent", label: "Sent" },
+    { id: "drafts", label: "Drafts" },
+    { id: "spam", label: "Spam" },
+  ];
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-background-light px-6 dark:border-gray-800 dark:bg-background-dark">
       <div className="flex items-center space-x-8">
@@ -8,14 +19,27 @@ const Header: React.FC = () => {
           <span className="material-icons-outlined text-primary">mail</span>
           <span>Mail</span>
         </div>
+
+        {/* CATEGORY NAV */}
         <nav className="hidden items-center space-x-6 text-sm font-medium text-gray-500 dark:text-gray-400 md:flex">
-          <a className="text-primary" href="#">Inbox</a>
-          <a className="hover:text-primary" href="#">Sent</a>
-          <a className="hover:text-primary" href="#">Drafts</a>
-          <a className="hover:text-primary" href="#">Spam</a>
+          {categories.map((cat) => (
+            <a
+              key={cat.id}
+              href={`#${cat.id}`}
+              className={
+                activeCategory === cat.id
+                  ? "text-primary font-semibold"
+                  : "hover:text-primary"
+              }
+            >
+              {cat.label}
+            </a>
+          ))}
         </nav>
       </div>
+
       <div className="flex items-center space-x-4">
+        {/* Search */}
         <div className="relative w-64">
           <span className="material-icons-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
             search
@@ -26,9 +50,11 @@ const Header: React.FC = () => {
             type="text"
           />
         </div>
+
         <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
           Compose
         </button>
+
         <img
           alt="User avatar"
           className="h-8 w-8 rounded-full"

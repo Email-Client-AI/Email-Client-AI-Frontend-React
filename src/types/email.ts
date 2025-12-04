@@ -29,3 +29,15 @@ export interface EmailPageResponse {
   totalOverDue: number;
   emails: Email[];
 }
+
+
+export const CategoryType = {
+  INBOX: "inbox",
+  SENT: "sent",
+  DRAFT: "drafts",
+  TRASH: "trash",
+  SPAM: "spam",
+  IMPORTANT: "important",
+}
+
+export type CategoryType = (typeof CategoryType)[keyof typeof CategoryType];

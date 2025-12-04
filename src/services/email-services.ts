@@ -1,12 +1,13 @@
 import api from "../libs/axios";
-import type { Email, EmailPageResponse } from "../types/email";
+import type { CategoryType, Email, EmailPageResponse } from "../types/email";
 
 export const getListEmails = async (
   page: number = 1,
-  size: number = 10
+  size: number = 10,
+  category: CategoryType
 ): Promise<EmailPageResponse> => {
   const res = await api.get<EmailPageResponse>(
-    `/emails?page=${page}&size=${size}`
+    `/emails?page=${page}&size=${size}&category=${category.toUpperCase()}`
   );
   return res.data;
 };
