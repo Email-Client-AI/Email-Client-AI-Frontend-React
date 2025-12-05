@@ -1,16 +1,51 @@
-import React from 'react';
+import axios from "axios";
+import React, { useState, useRef, useEffect } from "react";
 
 interface HeaderProps {
   activeCategory: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const categories = [
     { id: "inbox", label: "Inbox" },
     { id: "sent", label: "Sent" },
-    { id: "drafts", label: "Drafts" },
+    { id: "draft", label: "Draft" },
     { id: "spam", label: "Spam" },
   ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/logout`,
+        {},
+        { withCredentials: true }
+      );
+
+      // Clear all local storage + session storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Redirect
+      window.location.href = "/login";
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-background-light px-6 dark:border-gray-800 dark:bg-background-dark">
@@ -55,11 +90,26 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
           Compose
         </button>
 
-        <img
-          alt="User avatar"
-          className="h-8 w-8 rounded-full"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGg7a7B9Km5ABks-9R91QeA3urcAwROYtVqhiouMv3gd8b9IB5FTh4nrym697jCZgG89gswxQ4LdamuT-ZVe_M2K8eDXdmgxfKmisSOgwX8R6wrYlJ3mRi3FFhTc1GfM_Y9n3Y02wFkeBjaDV6lPenFD8bRpbfciXtGfCeAYAfJuWS4glS5CuqkARRw_yIcYxs9qEqYIfegeAEdlqZR73AJAWRL7muGDME3jnIp0lCWQtefPgWMfS4NpsyMmpAWJEEISl2UFp0VVM"
-        />
+        {/* Avatar + Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <img
+            alt="User avatar"
+            onClick={() => setOpen(!open)}
+            className="h-8 w-8 cursor-pointer rounded-full bg-gray-200 dark:bg-gray-700"
+            src="https://www.gravatar.com/avatar/?d=mp"
+          />
+
+          {open && (
+            <div className="absolute right-0 mt-2 w-36 rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+              <button
+                onClick={handleLogout}
+                className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

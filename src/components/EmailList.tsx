@@ -31,7 +31,7 @@ const EmailList: React.FC<EmailListProps> = ({
         {totalPages != 0 && (
           <div className="flex items-center gap-2">
             <button
-              disabled={page === 1}
+              disabled={page === 0}
               onClick={() => onPageChange(page - 1)}
               className="px-2 py-1 text-sm border rounded disabled:opacity-40"
             >
@@ -39,11 +39,11 @@ const EmailList: React.FC<EmailListProps> = ({
             </button>
 
             <span className="text-sm font-medium">
-              {page} / {totalPages}
+              {page + 1} / {totalPages}
             </span>
 
             <button
-              disabled={page === totalPages}
+              disabled={page === totalPages - 1}
               onClick={() => onPageChange(page + 1)}
               className="px-2 py-1 text-sm border rounded disabled:opacity-40"
             >

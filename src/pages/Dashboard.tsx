@@ -12,7 +12,7 @@ export default function Dashboard() {
   // const { user, logout } = useAuth();
   const [activeEmail, setActiveEmail] = useState<Email>();
   const [emails, setEmails] = useState<Email[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   const location = useLocation();

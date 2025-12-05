@@ -108,7 +108,7 @@ api.interceptors.response.use(
         // 5. If refresh fails (cookie expired/invalid), logout user
         processQueue(refreshError, null);
         clearAccessToken();
-        // window.location.href = '/login'; 
+        window.location.href = '/login'; 
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

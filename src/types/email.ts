@@ -34,7 +34,7 @@ export interface EmailPageResponse {
 export const CategoryType = {
   INBOX: "inbox",
   SENT: "sent",
-  DRAFT: "drafts",
+  DRAFT: "draft",
   TRASH: "trash",
   SPAM: "spam",
   IMPORTANT: "important",
