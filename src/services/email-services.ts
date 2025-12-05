@@ -1,5 +1,5 @@
 import api from "../libs/axios";
-import type { CategoryType, Email, EmailPageResponse } from "../types/email";
+import type { CategoryType, Email, EmailPageResponse, Thread } from "../types/email";
 
 export const getListEmails = async (
   page: number = 1,
@@ -12,9 +12,38 @@ export const getListEmails = async (
   return res.data;
 };
 
+export const getAllEmails = async (category: CategoryType): Promise<Email[]> => {
+    const res = await api.get<Email[]>(`/emails/all?category=${category.toUpperCase()}`);
+    return res.data;
+};
+
+export const groupEmailsByThread = (emails: Email[]): Thread[] => {
+    const threads: { [key: string]: Thread } = {};
+    emails.forEach((email) => {
+        if (!threads[email.threadId]) {
+            threads[email.threadId] = {
+                id: email.threadId,
+                emails: [],
+            };
+        }
+        threads[email.threadId].emails.push(email);
+    });
+    return Object.values(threads);
+};
+
+export const getAllEmailsAndGroupByThread = async (category: CategoryType): Promise<Thread[]> => {
+    const emails = await getAllEmails(category);
+    return groupEmailsByThread(emails);
+};
+
 export const getEmailById = async (id: string): Promise<Email> => {
   const res = await api.get<Email>(`/emails/details/${id}`);
   return res.data;
+};
+
+export const getAllEmailsByThread = async (threadId: string): Promise<Email[]> => {
+    const res = await api.get<Email[]>(`/emails/thread/${threadId}`);
+    return res.data;
 };
 
 export function formatReceivedDate(dateString: string): string {

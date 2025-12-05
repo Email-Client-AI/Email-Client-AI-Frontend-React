@@ -1,46 +1,97 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Header from "../components/Header";
 import EmailList from "../components/EmailList";
 import EmailDetail from "../components/EmailDetail";
-// import { useAuth } from "../contexts/AuthContext";
-// import { useAuth } from "../contexts/AuthContext";
-import { CategoryType, type Email } from "../types/email";
-import { getEmailById, getListEmails } from "../services/email-services";
+import { CategoryType, type Thread } from "../types/email";
+import {
+  getAllEmailsAndGroupByThread,
+  getAllEmailsByThread
+} from "../services/email-services";
 import { useLocation } from "react-router-dom";
 
+const ITEMS_PER_PAGE = 10;
+
 export default function Dashboard() {
-  // const { user, logout } = useAuth();
-  const [activeEmail, setActiveEmail] = useState<Email>();
-  const [emails, setEmails] = useState<Email[]>([]);
+  const [allThreads, setAllThreads] = useState<Thread[]>([]);
+  const [activeThread, setActiveThread] = useState<Thread | undefined>();
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
 
   const location = useLocation();
-  const category: CategoryType = location.hash ? location.hash.replace('#', '') : CategoryType.INBOX;
+  const category: CategoryType = location.hash
+    ? (location.hash.replace('#', '') as CategoryType)
+    : CategoryType.INBOX;
 
-  const fetchEmails = async (pageToLoad: number) => {
-    const emailPageResponse = await getListEmails(pageToLoad, 10, category);
+  // 1. Fetch All Emails & Group by Thread (Initial Load)
+  const fetchThreads = async () => {
+    setIsLoading(true);
+    try {
+      const threads = await getAllEmailsAndGroupByThread(category);
 
-    setEmails(emailPageResponse.emails);
-    setTotalPages(emailPageResponse.totalPages);
+      // Sort threads by the latest email in them (Newest threads on top)
+      const sortedThreads = threads.sort((a, b) => {
+        const lastEmailA = a.emails[a.emails.length - 1];
+        const lastEmailB = b.emails[b.emails.length - 1];
+        const dateA = new Date(lastEmailA?.receivedDate || 0).getTime();
+        const dateB = new Date(lastEmailB?.receivedDate || 0).getTime();
+        return dateB - dateA;
+      });
 
-    const detail = await getEmailById(emailPageResponse.emails[0].id);
-    setActiveEmail(detail);
+      setAllThreads(sortedThreads);
+      setPage(0);
+
+      // Auto-select the first thread if available
+      if (sortedThreads.length > 0) {
+        // Pass the fresh list explicitly because state updates are async
+        handleThreadSelect(sortedThreads[0].id, sortedThreads);
+      } else {
+        setActiveThread(undefined);
+      }
+    } catch (error) {
+      console.error("Failed to fetch threads", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchEmails(page);
-  }, [page, category]);
+    fetchThreads();
+  }, [category]);
 
-  const onEmailSelect = async (emailId: string) => {
-    const currentEmailDetail = emails.find(email => email.id === emailId);
-    if (currentEmailDetail?.bodyHtml) {
-      setActiveEmail(currentEmailDetail);
-      return;
+  // 2. Client-side Pagination Logic
+  const paginatedThreads = useMemo(() => {
+    const start = page * ITEMS_PER_PAGE;
+    return allThreads.slice(start, start + ITEMS_PER_PAGE);
+  }, [allThreads, page]);
+
+  const totalPages = Math.ceil(allThreads.length / ITEMS_PER_PAGE);
+
+  // 3. Handle Thread Selection & Fetch Full Conversation
+  const handleThreadSelect = async (threadId: string, sourceThreads = allThreads) => {
+    const threadIndex = sourceThreads.findIndex(t => t.id === threadId);
+    if (threadIndex === -1) return;
+
+    let selectedThread = sourceThreads[threadIndex];
+
+    try {
+      // NEW LOGIC: Fetch all emails for this thread in one request
+      const fullEmails = await getAllEmailsByThread(threadId);
+      console.log("full emails in thread", fullEmails);
+
+      // Create updated thread object
+      const updatedThread = { ...selectedThread, emails: fullEmails };
+
+      // 1. Update Active Thread immediately (so UI updates)
+      setActiveThread(updatedThread);
+
+      // 2. Update the main list in State (so we don't fetch again if clicked later)
+      setAllThreads((prevThreads) =>
+        prevThreads.map((t) => (t.id === threadId ? updatedThread : t))
+      );
+
+    } catch (error) {
+      console.error("Error fetching full thread conversation", error);
     }
-    const emailDetail = await getEmailById(emailId);
-    setEmails(emails.map(email => email.id === emailId ? emailDetail : email));
-    setActiveEmail(emailDetail);
   };
 
   return (
@@ -48,17 +99,22 @@ export default function Dashboard() {
       <Header activeCategory={category} />
 
       <div className="flex flex-1 overflow-hidden">
-        <EmailList
-          emails={emails}
-          activeEmailId={activeEmail?.id || ""}
-          onEmailSelect={onEmailSelect}
+        {isLoading && allThreads.length === 0 ? (
+          <div className="w-96 flex items-center justify-center border-r border-gray-200 dark:border-gray-800">
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        ) : (
+          <EmailList
+            threads={paginatedThreads}
+            activeThreadId={activeThread?.id || ""}
+            onThreadSelect={(id) => handleThreadSelect(id)}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        )}
 
-          page={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
-
-        <EmailDetail email={activeEmail} />
+        <EmailDetail thread={activeThread} />
       </div>
     </div>
   );

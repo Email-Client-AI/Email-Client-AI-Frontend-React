@@ -14,6 +14,11 @@ export interface Email {
   attachments: EmailAttachment[];
 }
 
+export interface Thread {
+    id: string;
+    emails: Email[];
+}
+
 export interface EmailAttachment {
     id: string;
     fileName?: string;
