@@ -41,7 +41,8 @@ export interface SendEmailRequest {
   bcc: string[];
   subject: string;
   bodyHtml: string;
-  replyToMessageId?: string; // Optional: used if you want to thread replies strictly
+  replyToMessageId?: string;
+  forwardMessageId?: string;
 }
 
 

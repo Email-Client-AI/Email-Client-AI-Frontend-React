@@ -26,31 +26,21 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
     );
   }
 
-  // Use the subject from the first email in the thread as the main subject
   const mainSubject = sortedEmails[0].subject;
 
-  // REFACTORED: Now accepts a specific email to reply to
+  // --- REPLY LOGIC ---
   const handleReply = (targetEmail: Email) => {
-    // 1. Prepare Subject
     let newSubject = targetEmail.subject;
     if (!newSubject.startsWith("Re:")) {
       newSubject = `Re: ${newSubject}`;
     }
 
-    // 2. Format Date
     const dateStr = new Date(targetEmail.receivedDate).toLocaleString(undefined, {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // 3. Construct the Quote Block
     const quoteHtml = `
-      <p></p>
-      <p></p>
+      <p></p><p></p>
       <div class="gmail_quote">
           On ${dateStr}, ${targetEmail.senderEmail} wrote:
           <blockquote style="margin: 0 0 0 .8ex; border-left: 1px #ccc solid; padding-left: 1ex;">
@@ -64,6 +54,42 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
       subject: newSubject,
       body: quoteHtml,
       replyToId: targetEmail.id
+    });
+  };
+
+  // --- FORWARD LOGIC ---
+  const handleForward = (targetEmail: Email) => {
+    // 1. Subject: Prefix with Fwd:
+    let newSubject = targetEmail.subject;
+    if (!newSubject.startsWith("Fwd:")) {
+      newSubject = `Fwd: ${newSubject}`;
+    }
+
+    // 2. Format Date
+    const dateStr = new Date(targetEmail.receivedDate).toLocaleString(undefined, {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    // 3. Construct Forward Header (Gmail Style)
+    // Note: No "blockquote" indent usually for forwards, but a clear separator
+    const forwardHtml = `
+      <p></p><p></p>
+      <div class="gmail_quote">
+          ---------- Forwarded message ---------<br>
+          From: <strong>${targetEmail.senderEmail}</strong><br>
+          Date: ${dateStr}<br>
+          Subject: ${targetEmail.subject}<br>
+          To: ${targetEmail.recipientEmails.join(', ')}<br>
+          <br>
+          ${targetEmail.bodyHtml || targetEmail.bodyText || ""}
+      </div>
+    `;
+
+    openCompose({
+      to: "", // Forwarding leaves 'To' empty
+      subject: newSubject,
+      body: forwardHtml,
+      forwardEmailId: targetEmail.id
     });
   };
 
@@ -87,9 +113,7 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
         {sortedEmails.map((email: Email, index: number) => (
           <div
             key={email.id}
-            className={`border rounded-lg p-6 shadow-sm transition-all ${
-              // Highlight the last email slightly to show it's the latest
-              index === sortedEmails.length - 1
+            className={`border rounded-lg p-6 shadow-sm transition-all ${index === sortedEmails.length - 1
                 ? 'bg-white dark:bg-gray-900 border-primary/20 ring-1 ring-primary/10'
                 : 'bg-gray-50/50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700'
               }`}
@@ -97,7 +121,6 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
             {/* Individual Email Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
-                {/* Avatar Placeholder */}
                 <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
                   {email.senderEmail.charAt(0).toUpperCase()}
                 </div>
@@ -111,19 +134,28 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
                 </div>
               </div>
 
-              {/* Right Side: Date + Individual Reply Button */}
+              {/* Right Side: Date + Actions */}
               <div className="flex items-center space-x-3">
                 <span className="text-xs text-gray-500 dark:text-gray-400 block">
                   {formatFullDateTime(email.receivedDate)}
                 </span>
 
-                {/* NEW: Individual Reply Button */}
+                {/* Reply Button */}
                 <button
                   onClick={() => handleReply(email)}
                   className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                  title="Reply to this message"
+                  title="Reply"
                 >
                   <span className="material-icons-outlined text-lg">reply</span>
+                </button>
+
+                {/* NEW: Forward Button */}
+                <button
+                  onClick={() => handleForward(email)}
+                  className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title="Forward"
+                >
+                  <span className="material-icons-outlined text-lg">forward</span>
                 </button>
               </div>
             </div>
@@ -137,7 +169,7 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
               )}
             </div>
 
-            {/* Attachments (Optional UI) */}
+            {/* Attachments */}
             {email.attachments && email.attachments.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <p className="text-xs font-medium text-gray-500 mb-2">Attachments ({email.attachments.length})</p>
@@ -155,7 +187,7 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
         ))}
       </div>
 
-      {/* Footer Actions (Reply to Thread - defaults to latest email) */}
+      {/* Footer Actions */}
       <div className="border-t border-gray-200 p-6 dark:border-gray-800 bg-background-light dark:bg-background-dark">
         <div className="flex items-center space-x-2">
           <button
@@ -165,7 +197,10 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
             <span className="material-icons-outlined text-base">reply</span>
             <span>Reply</span>
           </button>
-          <button className="flex items-center space-x-2 rounded-md border border-gray-300 bg-background-light px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+          <button
+            onClick={() => handleForward(sortedEmails[sortedEmails.length - 1])}
+            className="flex items-center space-x-2 rounded-md border border-gray-300 bg-background-light px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
             <span className="material-icons-outlined text-base">forward</span>
             <span>Forward</span>
           </button>

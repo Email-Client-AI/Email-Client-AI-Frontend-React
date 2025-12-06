@@ -3,8 +3,9 @@ import React, { createContext, useContext, useState, type ReactNode } from 'reac
 export interface ComposeData {
     to?: string;
     subject?: string;
-    body?: string; // HTML string for reply quotes
+    body?: string;
     replyToId?: string;
+    forwardEmailId?: string; // NEW FIELD
 }
 
 interface ComposeContextType {
