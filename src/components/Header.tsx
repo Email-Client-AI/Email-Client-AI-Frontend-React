@@ -1,5 +1,6 @@
 import axios from "axios";
 import React, { useState, useRef, useEffect } from "react";
+import { useCompose } from "../contexts/ComposeContext";
 
 interface HeaderProps {
   activeCategory: string;
@@ -7,6 +8,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
   const [open, setOpen] = useState(false);
+  const { openCompose } = useCompose(); // Use Hook
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const categories = [
@@ -86,7 +88,9 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
           />
         </div>
 
-        <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+        <button
+          onClick={() => openCompose()}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
           Compose
         </button>
 

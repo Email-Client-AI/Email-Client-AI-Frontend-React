@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import type { Thread, Email } from '../types/email';
 import { formatFullDateTime } from '../services/email-services';
+import { useCompose } from '../contexts/ComposeContext';
 
 interface EmailDetailProps {
   thread?: Thread;
 }
 
 const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
+  const { openCompose } = useCompose();
+
   // Sort emails by date (Oldest to Newest for conversation flow)
   const sortedEmails = useMemo(() => {
     if (!thread || !thread.emails) return [];
@@ -26,11 +29,49 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
   // Use the subject from the first email in the thread as the main subject
   const mainSubject = sortedEmails[0].subject;
 
+  // REFACTORED: Now accepts a specific email to reply to
+  const handleReply = (targetEmail: Email) => {
+    // 1. Prepare Subject
+    let newSubject = targetEmail.subject;
+    if (!newSubject.startsWith("Re:")) {
+      newSubject = `Re: ${newSubject}`;
+    }
+
+    // 2. Format Date
+    const dateStr = new Date(targetEmail.receivedDate).toLocaleString(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // 3. Construct the Quote Block
+    const quoteHtml = `
+      <p></p>
+      <p></p>
+      <div class="gmail_quote">
+          On ${dateStr}, ${targetEmail.senderEmail} wrote:
+          <blockquote style="margin: 0 0 0 .8ex; border-left: 1px #ccc solid; padding-left: 1ex;">
+              ${targetEmail.bodyHtml || targetEmail.bodyText || ""}
+          </blockquote>
+      </div>
+    `;
+
+    openCompose({
+      to: targetEmail.senderEmail,
+      subject: newSubject,
+      body: quoteHtml,
+      replyToId: targetEmail.id
+    });
+  };
+
   return (
     <main className="flex-1 flex flex-col overflow-y-auto bg-background-light dark:bg-background-dark">
       {/* Thread Header */}
       <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-800 sticky top-0 bg-background-light dark:bg-background-dark z-10">
-        <h1 className="text-2xl font-bold truncate pr-4">{mainSubject}</h1>
+        <h1 className="text-2xl font-bold truncate pr-4 text-gray-900 dark:text-gray-100">{mainSubject}</h1>
         <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 shrink-0">
           <span className="text-sm border px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-700">
             {sortedEmails.length} Messages
@@ -41,6 +82,7 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
         </div>
       </div>
 
+      {/* Emails Conversation List */}
       <div className="flex-1 p-6 space-y-8">
         {sortedEmails.map((email: Email, index: number) => (
           <div
@@ -68,16 +110,26 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
+
+              {/* Right Side: Date + Individual Reply Button */}
+              <div className="flex items-center space-x-3">
                 <span className="text-xs text-gray-500 dark:text-gray-400 block">
                   {formatFullDateTime(email.receivedDate)}
                 </span>
+
+                {/* NEW: Individual Reply Button */}
+                <button
+                  onClick={() => handleReply(email)}
+                  className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title="Reply to this message"
+                >
+                  <span className="material-icons-outlined text-lg">reply</span>
+                </button>
               </div>
             </div>
 
             {/* Individual Email Body */}
-            <div className="prose prose-sm max-w-none text-gray-700 dark:prose-invert dark:text-gray-300 overflow-hidden">
-              {/* Check if bodyHtml exists, otherwise show a placeholder or snippet */}
+            <div className="prose prose-sm max-w-none text-gray-700 dark:prose-invert dark:text-gray-300 overflow-hidden break-words">
               {email.bodyHtml ? (
                 <div dangerouslySetInnerHTML={{ __html: email.bodyHtml }} />
               ) : (
@@ -91,9 +143,10 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
                 <p className="text-xs font-medium text-gray-500 mb-2">Attachments ({email.attachments.length})</p>
                 <div className="flex flex-wrap gap-2">
                   {email.attachments.map(att => (
-                    <span key={att.id} className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                      {att.fileName}
-                    </span>
+                    <div key={att.id} className="flex items-center space-x-1 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                      <span className="material-icons-outlined text-sm">attachment</span>
+                      <span>{att.fileName}</span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -102,12 +155,15 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
         ))}
       </div>
 
-      {/* Footer Actions (Reply to Thread) */}
+      {/* Footer Actions (Reply to Thread - defaults to latest email) */}
       <div className="border-t border-gray-200 p-6 dark:border-gray-800 bg-background-light dark:bg-background-dark">
         <div className="flex items-center space-x-2">
-          <button className="flex items-center space-x-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-            <span className="material-icons-outlined text-base">reply_all</span>
-            <span>Reply All</span>
+          <button
+            onClick={() => handleReply(sortedEmails[sortedEmails.length - 1])}
+            className="flex items-center space-x-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+          >
+            <span className="material-icons-outlined text-base">reply</span>
+            <span>Reply</span>
           </button>
           <button className="flex items-center space-x-2 rounded-md border border-gray-300 bg-background-light px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
             <span className="material-icons-outlined text-base">forward</span>

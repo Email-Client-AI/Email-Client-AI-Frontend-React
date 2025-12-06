@@ -1,5 +1,5 @@
 import api from "../libs/axios";
-import type { CategoryType, Email, EmailPageResponse, Thread } from "../types/email";
+import type { CategoryType, Email, EmailPageResponse, SendEmailRequest, Thread } from "../types/email";
 
 export const getListEmails = async (
   page: number = 1,
@@ -44,6 +44,10 @@ export const getEmailById = async (id: string): Promise<Email> => {
 export const getAllEmailsByThread = async (threadId: string): Promise<Email[]> => {
     const res = await api.get<Email[]>(`/emails/thread/${threadId}`);
     return res.data;
+};
+
+export const sendEmail = async (payload: SendEmailRequest): Promise<void> => {
+  await api.post("/emails/send", payload);
 };
 
 export function formatReceivedDate(dateString: string): string {

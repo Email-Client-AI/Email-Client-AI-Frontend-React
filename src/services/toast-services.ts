@@ -1,7 +1,4 @@
 'use client';
-// A simple toast service using alert() for demonstration purposes.
-// we will replace it with a proper toast implementation later.
-
 export const ToastType = {
   SUCCESS: 'success',
   ERROR: 'error',

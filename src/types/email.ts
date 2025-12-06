@@ -35,6 +35,15 @@ export interface EmailPageResponse {
   emails: Email[];
 }
 
+export interface SendEmailRequest {
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  bodyHtml: string;
+  replyToMessageId?: string; // Optional: used if you want to thread replies strictly
+}
+
 
 export const CategoryType = {
   INBOX: "inbox",
