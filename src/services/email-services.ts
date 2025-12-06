@@ -50,6 +50,41 @@ export const sendEmail = async (payload: SendEmailRequest): Promise<void> => {
   await api.post("/emails/send", payload);
 };
 
+export const formatFileSize = (bytes?: number): string => {
+  if (bytes === undefined || bytes === null) return '';
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+// API Call to download attachment
+export const downloadAttachment = async (emailId: string, attachmentId: string, fileName: string): Promise<void> => {
+  try {
+    // NOTE: Adjust the endpoint path to match your Backend Controller
+    // Example: @GetMapping("/attachments/{id}")
+    const response = await api.get(`/emails/${emailId}/attachments/${attachmentId}`, {
+      responseType: 'blob', // Important: response must be treated as a file
+    });
+
+    // Create a temporary URL for the blob
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName); // Force download with original filename
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download failed", error);
+    throw error;
+  }
+};
+
 export function formatReceivedDate(dateString: string): string {
   const now = new Date();
   const received = new Date(dateString);

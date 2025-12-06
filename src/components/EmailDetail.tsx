@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import type { Thread, Email } from '../types/email';
-import { formatFullDateTime } from '../services/email-services';
+import type { Thread, Email, EmailAttachment } from '../types/email';
+import { formatFullDateTime, downloadAttachment, formatFileSize } from '../services/email-services';
 import { useCompose } from '../contexts/ComposeContext';
+import { toastService } from '../services/toast-services';
 
 interface EmailDetailProps {
   thread?: Thread;
@@ -27,6 +28,16 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
   }
 
   const mainSubject = sortedEmails[0].subject;
+
+  // --- DOWNLOAD LOGIC ---
+  const handleDownloadClick = async (emailId: string, attachmentId: string, fileName: string) => {
+    try {
+      // Assuming 'id' is what the backend needs. If it needs gmailAttachmentId, swap it here.
+      await downloadAttachment(emailId, attachmentId, fileName);
+    } catch (error) {
+      toastService.error("Failed to download attachment.");
+    }
+  };
 
   // --- REPLY LOGIC ---
   const handleReply = (targetEmail: Email) => {
@@ -59,19 +70,15 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
 
   // --- FORWARD LOGIC ---
   const handleForward = (targetEmail: Email) => {
-    // 1. Subject: Prefix with Fwd:
     let newSubject = targetEmail.subject;
     if (!newSubject.startsWith("Fwd:")) {
       newSubject = `Fwd: ${newSubject}`;
     }
 
-    // 2. Format Date
     const dateStr = new Date(targetEmail.receivedDate).toLocaleString(undefined, {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // 3. Construct Forward Header (Gmail Style)
-    // Note: No "blockquote" indent usually for forwards, but a clear separator
     const forwardHtml = `
       <p></p><p></p>
       <div class="gmail_quote">
@@ -86,7 +93,7 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
     `;
 
     openCompose({
-      to: "", // Forwarding leaves 'To' empty
+      to: "",
       subject: newSubject,
       body: forwardHtml,
       forwardEmailId: targetEmail.id
@@ -114,8 +121,8 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
           <div
             key={email.id}
             className={`border rounded-lg p-6 shadow-sm transition-all ${index === sortedEmails.length - 1
-                ? 'bg-white dark:bg-gray-900 border-primary/20 ring-1 ring-primary/10'
-                : 'bg-gray-50/50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700'
+              ? 'bg-white dark:bg-gray-900 border-primary/20 ring-1 ring-primary/10'
+              : 'bg-gray-50/50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700'
               }`}
           >
             {/* Individual Email Header */}
@@ -139,8 +146,6 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
                 <span className="text-xs text-gray-500 dark:text-gray-400 block">
                   {formatFullDateTime(email.receivedDate)}
                 </span>
-
-                {/* Reply Button */}
                 <button
                   onClick={() => handleReply(email)}
                   className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
@@ -148,8 +153,6 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
                 >
                   <span className="material-icons-outlined text-lg">reply</span>
                 </button>
-
-                {/* NEW: Forward Button */}
                 <button
                   onClick={() => handleForward(email)}
                   className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
@@ -169,16 +172,41 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
               )}
             </div>
 
-            {/* Attachments */}
+            {/* Attachments Section (Updated) */}
             {email.attachments && email.attachments.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-medium text-gray-500 mb-2">Attachments ({email.attachments.length})</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">
+                  Attachments ({email.attachments.length})
+                </p>
+                <div className="flex flex-wrap gap-3">
                   {email.attachments.map(att => (
-                    <div key={att.id} className="flex items-center space-x-1 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                      <span className="material-icons-outlined text-sm">attachment</span>
-                      <span>{att.fileName}</span>
-                    </div>
+                    <button
+                      key={att.id}
+                      onClick={() => handleDownloadClick(email.id, att.id, att.fileName || "unnamed")}
+                      className="group flex items-center space-x-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md px-3 py-2 hover:border-primary hover:shadow-sm transition-all text-left max-w-[250px]"
+                      title={`Download ${att.fileName}`}
+                    >
+                      {/* Icon based on generic type */}
+                      <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors">
+                        <span className="material-icons-outlined text-gray-500 group-hover:text-primary text-xl">
+                          description
+                        </span>
+                      </div>
+
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                          {att.fileName || "Unnamed File"}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {formatFileSize(att.size)}
+                        </p>
+                      </div>
+
+                      {/* Download Icon on Hover */}
+                      <span className="material-icons-outlined text-gray-400 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity text-lg ml-auto">
+                        download
+                      </span>
+                    </button>
                   ))}
                 </div>
               </div>
