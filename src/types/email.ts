@@ -12,7 +12,18 @@ export interface Email {
   recipientEmails: string[];
   labels: string[];
   attachments: EmailAttachment[];
+  status?: EmailStatus;
 }
+
+export const EmailStatus = {
+  TODO: "todo",
+  INPROGRESS: "inprogress",
+  DONE: "done",
+  SNOOZED: "snoozed",
+  REMOVED: "removed",
+} as const;
+
+export type EmailStatus = (typeof EmailStatus)[keyof typeof EmailStatus];
 
 export interface Thread {
     id: string;

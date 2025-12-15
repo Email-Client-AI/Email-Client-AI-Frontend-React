@@ -13,6 +13,9 @@ export const getListEmails = async (
 };
 
 export const getAllEmails = async (category: CategoryType): Promise<Email[]> => {
+    if (['todo', 'inprogress', 'done', 'snoozed', 'removed'].includes(category)) {
+        return getEmailsByStatus(category);
+    }
     const res = await api.get<Email[]>(`/emails/all?category=${category.toUpperCase()}`);
     return res.data;
 };
@@ -48,6 +51,23 @@ export const getAllEmailsByThread = async (threadId: string): Promise<Email[]> =
 
 export const sendEmail = async (payload: SendEmailRequest): Promise<void> => {
   await api.post("/emails/send", payload);
+};
+
+export const getEmailsByStatus = async (status: string): Promise<Email[]> => {
+  const res = await api.get<Email[]>(`/emails/all?status=${status.toUpperCase()}`);
+  return res.data;
+};
+
+export const updateEmailStatus = async (id: string, status: string): Promise<void> => {
+  await api.patch(`/emails/${id}/status/${status.toUpperCase()}`);
+};
+
+export const snoozeEmail = async (id: string, until?: Date): Promise<void> => {
+  await api.post(`/emails/${id}/snooze`, { until });
+};
+
+export const unsnoozeEmail = async (id: string): Promise<void> => {
+  await api.post(`/emails/${id}/unsnooze`);
 };
 
 export const formatFileSize = (bytes?: number): string => {

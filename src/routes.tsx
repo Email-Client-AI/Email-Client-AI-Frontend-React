@@ -3,6 +3,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import KanbanBoard from "./pages/KanbanBoard";
 
 export default function AppRoutes() {
   return (
@@ -15,6 +16,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/kanban"
+          element={
+            <ProtectedRoute>
+              <KanbanBoard />
             </ProtectedRoute>
           }
         />

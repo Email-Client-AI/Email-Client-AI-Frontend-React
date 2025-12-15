@@ -58,8 +58,6 @@ api.interceptors.response.use(
 
     // 1. Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
-      console.log("try refreshing")
-      
       // If we are already refreshing, add this request to a queue and wait
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {

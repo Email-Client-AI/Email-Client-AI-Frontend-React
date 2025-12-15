@@ -16,6 +16,8 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
     { id: "sent", label: "Sent" },
     { id: "draft", label: "Draft" },
     { id: "spam", label: "Spam" },
+    { id: "snoozed", label: "Snoozed" },
+    { id: "kanban", label: "Kanban Board" },
   ];
 
   // Close dropdown when clicking outside
@@ -62,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
           {categories.map((cat) => (
             <a
               key={cat.id}
-              href={`#${cat.id}`}
+              href={cat.id === "kanban" ? "/kanban" : `/dashboard#${cat.id}`}
               className={
                 activeCategory === cat.id
                   ? "text-primary font-semibold"
