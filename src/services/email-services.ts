@@ -1,5 +1,5 @@
 import api from "../libs/axios";
-import type { CategoryType, Email, EmailPageResponse, SendEmailRequest, Thread } from "../types/email";
+import type { CategoryType, Email, EmailPageResponse, SendEmailRequest, Thread, Suggestion } from "../types/email";
 
 export const getListEmails = async (
   page: number = 1,
@@ -142,3 +142,24 @@ export function formatFullDateTime(dateString: string): string {
   });
 }
 
+
+export const summarizeEmail = async (threadId: string): Promise<string> => {
+  const res = await api.get<string>(`/emails/summarize`, {
+    params: { threadId }
+  });
+  return res.data;
+};
+
+export const suggestEmails = async (query: string): Promise<Suggestion[]> => {
+  const res = await api.get<Suggestion[]>(`/emails/suggest`, {
+    params: { q: query }
+  });
+  return res.data;
+};
+
+export const searchEmails = async (query: string): Promise<Email[]> => {
+  const res = await api.get<Email[]>(`/emails/search`, {
+    params: { q: query }
+  });
+  return res.data;
+};

@@ -14,8 +14,10 @@ import { ComposeProvider } from "../contexts/ComposeContext";
 import { CategoryType, type Thread } from "../types/email";
 import {
   getAllEmailsAndGroupByThread,
-  getAllEmailsByThread
+  getAllEmailsByThread,
+  groupEmailsByThread
 } from "../services/email-services";
+import type { Email } from "../types/email";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -111,10 +113,25 @@ export default function Dashboard() {
     }
   };
 
+  const handleSearchResults = (emails: Email[]) => {
+    // Group search results by thread
+    const threads = groupEmailsByThread(emails);
+
+
+    setAllThreads(threads);
+    setPage(0);
+
+    if (threads.length > 0) {
+      handleThreadSelect(threads[0].id, threads);
+    } else {
+      setActiveThread(undefined);
+    }
+  };
+
   return (
     <ComposeProvider>
       <div className="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100 flex h-screen w-full flex-col">
-        <Header activeCategory={category} />
+        <Header activeCategory={category} onSearch={handleSearchResults} />
 
         <div className="flex flex-1 overflow-hidden">
           {isLoading && allThreads.length === 0 ? (
