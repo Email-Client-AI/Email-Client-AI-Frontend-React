@@ -1,15 +1,73 @@
 import axios from "axios";
 import React, { useState, useRef, useEffect } from "react";
 import { useCompose } from "../contexts/ComposeContext";
+import { suggestEmails, searchEmails } from "../services/email-services";
+import type { Suggestion, Email } from "../types/email";
 
 interface HeaderProps {
   activeCategory: string;
+  onSearch?: (emails: Email[]) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
+const Header: React.FC<HeaderProps> = ({ activeCategory, onSearch }) => {
   const [open, setOpen] = useState(false);
   const { openCompose } = useCompose(); // Use Hook
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Close search suggestions when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.trim().length > 0) {
+      try {
+        const results = await suggestEmails(query);
+        setSuggestions(results);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Failed to fetch suggestions", error);
+      }
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const executeSearch = async (query: string) => {
+    if (!query.trim()) return;
+    setShowSuggestions(false);
+    setSearchQuery(query); // Ensure input matches clicked suggestion
+    try {
+      const results = await searchEmails(query);
+      if (onSearch) {
+        onSearch(results);
+      }
+    } catch (error) {
+      console.error("Search failed", error);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      executeSearch(searchQuery);
+    }
+  };
 
   const categories = [
     { id: "inbox", label: "Inbox" },
@@ -79,7 +137,7 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
 
       <div className="flex items-center space-x-4">
         {/* Search */}
-        <div className="relative w-64">
+        <div className="relative w-[28rem]" ref={searchRef}>
           <span className="material-icons-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
             search
           </span>
@@ -87,7 +145,31 @@ const Header: React.FC<HeaderProps> = ({ activeCategory }) => {
             className="w-full rounded-md border-gray-300 bg-gray-100 py-2 pl-10 pr-4 text-sm focus:border-primary focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
             placeholder="Search"
             type="text"
+            value={searchQuery}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              if (searchQuery.trim().length > 0) setShowSuggestions(true);
+            }}
           />
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                  onClick={() => executeSearch(suggestion.text)}
+                >
+                  <span className="material-icons-outlined text-gray-400 text-xs">
+                    {suggestion.type === 'history' ? 'history' : 'search'}
+                  </span>
+                  <span>{suggestion.text}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <button

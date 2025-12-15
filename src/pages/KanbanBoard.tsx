@@ -1,18 +1,25 @@
-import React, { useEffect, useState } from "react";
-import { EmailStatus, CategoryType, type Email } from "../types/email";
+import React, { useEffect, useState, useMemo } from "react";
+import { EmailStatus, CategoryType, type Email, type Thread } from "../types/email";
 import {
     getListEmails,
     getEmailsByStatus,
     updateEmailStatus,
     snoozeEmail,
+    groupEmailsByThread,
+    getAllEmailsByThread,
 } from "../services/email-services";
 import KanbanColumn from "../components/KanbanColumn";
 import SnoozeModal from "../components/SnoozeModal";
 import Header from "../components/Header";
 import { ComposeProvider } from "../contexts/ComposeContext";
 import ComposeModal from "../components/ComposeModal";
+import EmailList from "../components/EmailList";
+import EmailDetail from "../components/EmailDetail";
+
+const ITEMS_PER_PAGE = 10;
 
 const KanbanBoard: React.FC = () => {
+    // Kanban State
     const [columns, setColumns] = useState<{
         [key: string]: Email[];
     }>({
@@ -25,6 +32,12 @@ const KanbanBoard: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [snoozeModalOpen, setSnoozeModalOpen] = useState(false);
     const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+
+    // Search / Dashboard State
+    const [isSearchActive, setIsSearchActive] = useState(false);
+    const [searchThreads, setSearchThreads] = useState<Thread[]>([]);
+    const [activeThread, setActiveThread] = useState<Thread | undefined>();
+    const [page, setPage] = useState(0);
 
     const fetchBoardData = async () => {
         setIsLoading(true);
@@ -144,55 +157,118 @@ const KanbanBoard: React.FC = () => {
         }
     };
 
+    // --- Search Logic ---
+
+    const handleSearchResults = (emails: Email[]) => {
+        const threads = groupEmailsByThread(emails);
+        setSearchThreads(threads);
+        setIsSearchActive(true);
+        setPage(0);
+
+        if (threads.length > 0) {
+            handleThreadSelect(threads[0].id, threads);
+        } else {
+            setActiveThread(undefined);
+        }
+    };
+
+    const handleThreadSelect = async (threadId: string, sourceThreads = searchThreads) => {
+        const threadIndex = sourceThreads.findIndex(t => t.id === threadId);
+        if (threadIndex === -1) return;
+
+        const selectedThread = sourceThreads[threadIndex];
+
+        // Check if we need to fetch full content.
+        const hasMissingBody = selectedThread.emails.some(email => !email.bodyHtml);
+
+        if (hasMissingBody) {
+            try {
+                const fullEmails = await getAllEmailsByThread(threadId);
+                const updatedThread = { ...selectedThread, emails: fullEmails };
+
+                setActiveThread(updatedThread);
+                setSearchThreads((prevThreads) =>
+                    prevThreads.map((t) => (t.id === threadId ? updatedThread : t))
+                );
+            } catch (error) {
+                console.error("Error fetching full thread conversation", error);
+            }
+        } else {
+            setActiveThread(selectedThread);
+        }
+    };
+
+    const paginatedThreads = useMemo(() => {
+        const start = page * ITEMS_PER_PAGE;
+        return searchThreads.slice(start, start + ITEMS_PER_PAGE);
+    }, [searchThreads, page]);
+
+    const totalPages = Math.ceil(searchThreads.length / ITEMS_PER_PAGE);
+
+
     return (
         <ComposeProvider>
             <div className="flex h-screen flex-col bg-background-light dark:bg-background-dark">
-                <Header activeCategory="kanban" />
+                <Header activeCategory="kanban" onSearch={handleSearchResults} />
 
                 <div className="flex flex-1 flex-col overflow-hidden">
-                    {/* Board Area */}
-                    <div className="flex flex-1 gap-6 overflow-x-auto p-6">
-                        {isLoading ? (
-                            <div className="flex h-full w-full items-center justify-center">
-                                <span className="text-gray-500">Loading Board...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <KanbanColumn
-                                    title="Inbox"
-                                    status="inbox"
-                                    emails={columns.inbox}
-                                    onDrop={handleDrop}
-                                    onRemove={handleRemove}
-                                    onSnooze={openSnoozeModal}
-                                />
-                                <KanbanColumn
-                                    title="To Do"
-                                    status={EmailStatus.TODO}
-                                    emails={columns.todo}
-                                    onDrop={handleDrop}
-                                    onRemove={handleRemove}
-                                    onSnooze={openSnoozeModal}
-                                />
-                                <KanbanColumn
-                                    title="In Progress"
-                                    status={EmailStatus.INPROGRESS}
-                                    emails={columns.inprogress}
-                                    onDrop={handleDrop}
-                                    onRemove={handleRemove}
-                                    onSnooze={openSnoozeModal}
-                                />
-                                <KanbanColumn
-                                    title="Done"
-                                    status={EmailStatus.DONE}
-                                    emails={columns.done}
-                                    onDrop={handleDrop}
-                                    onRemove={handleRemove}
-                                    onSnooze={openSnoozeModal}
-                                />
-                            </>
-                        )}
-                    </div>
+                    {/* Board Area or Search Results */}
+                    {isSearchActive ? (
+                        <div className="flex flex-1 overflow-hidden">
+                            <EmailList
+                                threads={paginatedThreads}
+                                activeThreadId={activeThread?.id || ""}
+                                onThreadSelect={(id) => handleThreadSelect(id)}
+                                page={page}
+                                totalPages={totalPages}
+                                onPageChange={setPage}
+                            />
+                            <EmailDetail thread={activeThread} />
+                        </div>
+                    ) : (
+                        <div className="flex flex-1 gap-6 overflow-x-auto p-6">
+                            {isLoading ? (
+                                <div className="flex h-full w-full items-center justify-center">
+                                    <span className="text-gray-500">Loading Board...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <KanbanColumn
+                                        title="Inbox"
+                                        status="inbox"
+                                        emails={columns.inbox}
+                                        onDrop={handleDrop}
+                                        onRemove={handleRemove}
+                                        onSnooze={openSnoozeModal}
+                                    />
+                                    <KanbanColumn
+                                        title="To Do"
+                                        status={EmailStatus.TODO}
+                                        emails={columns.todo}
+                                        onDrop={handleDrop}
+                                        onRemove={handleRemove}
+                                        onSnooze={openSnoozeModal}
+                                    />
+                                    <KanbanColumn
+                                        title="In Progress"
+                                        status={EmailStatus.INPROGRESS}
+                                        emails={columns.inprogress}
+                                        onDrop={handleDrop}
+                                        onRemove={handleRemove}
+                                        onSnooze={openSnoozeModal}
+                                    />
+                                    <KanbanColumn
+                                        title="Done"
+                                        status={EmailStatus.DONE}
+                                        emails={columns.done}
+                                        onDrop={handleDrop}
+                                        onRemove={handleRemove}
+                                        onSnooze={openSnoozeModal}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <SnoozeModal

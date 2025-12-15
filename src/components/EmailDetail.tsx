@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { Thread, Email, EmailAttachment } from '../types/email';
-import { formatFullDateTime, downloadAttachment, formatFileSize } from '../services/email-services';
+import { formatFullDateTime, downloadAttachment, formatFileSize, summarizeEmail } from '../services/email-services';
 import { useCompose } from '../contexts/ComposeContext';
 import { toastService } from '../services/toast-services';
 
@@ -10,6 +10,15 @@ interface EmailDetailProps {
 
 const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
   const { openCompose } = useCompose();
+  const [summary, setSummary] = React.useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = React.useState(false);
+  const [showSummary, setShowSummary] = React.useState(false);
+
+  // Reset summary when thread changes
+  React.useEffect(() => {
+    setSummary(null);
+    setShowSummary(false);
+  }, [thread?.id]);
 
   // Sort emails by date (Oldest to Newest for conversation flow)
   const sortedEmails = useMemo(() => {
@@ -36,6 +45,22 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
       await downloadAttachment(emailId, attachmentId, fileName);
     } catch (error) {
       toastService.error("Failed to download attachment.");
+    }
+  };
+
+  // --- SUMMARIZE LOGIC ---
+  const handleSummarize = async () => {
+    if (!thread) return;
+    setIsSummarizing(true);
+    setShowSummary(true);
+    try {
+      const result = await summarizeEmail(thread.id);
+      setSummary(result);
+    } catch (error) {
+      toastService.error("Failed to summarize email.");
+      setShowSummary(false);
+    } finally {
+      setIsSummarizing(false);
     }
   };
 
@@ -106,6 +131,13 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
       <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-800 sticky top-0 bg-background-light dark:bg-background-dark z-10">
         <h1 className="text-2xl font-bold truncate pr-4 text-gray-900 dark:text-gray-100">{mainSubject}</h1>
         <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 shrink-0">
+          <button
+            onClick={handleSummarize}
+            className="flex items-center space-x-1 text-sm border px-3 py-1 rounded bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 transition-colors"
+          >
+            <span className="material-icons-outlined text-base">auto_awesome</span>
+            <span>Summarize with AI</span>
+          </button>
           <span className="text-sm border px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-700">
             {sortedEmails.length} Messages
           </span>
@@ -114,6 +146,46 @@ const EmailDetail: React.FC<EmailDetailProps> = ({ thread }) => {
           </button>
         </div>
       </div>
+
+      {/* Summary Section */}
+      {showSummary && (
+        <div className="mx-6 mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2 text-blue-800 dark:text-blue-300 font-semibold">
+              <span className="material-icons-outlined text-lg">auto_awesome</span>
+              <span>AI Summary</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleSummarize}
+                disabled={isSummarizing}
+                className="text-xs flex items-center space-x-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 disabled:opacity-50"
+              >
+                <span className="material-icons-outlined text-sm">refresh</span>
+                <span>Regenerate</span>
+              </button>
+              <button
+                onClick={() => setShowSummary(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <span className="material-icons-outlined text-lg">close</span>
+              </button>
+            </div>
+          </div>
+          <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+            {isSummarizing ? (
+              <div className="flex items-center space-x-2 animate-pulse">
+                <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
+                <div className="h-2 w-2 bg-blue-400 rounded-full animation-delay-200"></div>
+                <div className="h-2 w-2 bg-blue-400 rounded-full animation-delay-400"></div>
+                <span>Generating summary...</span>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap">{summary}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Emails Conversation List */}
       <div className="flex-1 p-6 space-y-8">

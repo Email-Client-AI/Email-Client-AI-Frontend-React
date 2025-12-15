@@ -67,3 +67,8 @@ export const CategoryType = {
 }
 
 export type CategoryType = (typeof CategoryType)[keyof typeof CategoryType];
+
+export interface Suggestion {
+  text: string;
+  type: 'history' | 'extracted';
+}
