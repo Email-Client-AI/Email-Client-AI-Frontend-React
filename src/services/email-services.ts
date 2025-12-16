@@ -92,11 +92,16 @@ export const updateEmailStatus = async (id: string, statusId: number): Promise<v
 };
 
 export const snoozeEmail = async (id: string, until?: Date): Promise<void> => {
-  await api.post(`/emails/${id}/snooze`, { until });
+  if(!until) {
+    await api.patch(`/emails/${id}/snooze?until=`);
+  }
+  else {
+    await api.patch(`/emails/${id}/snooze?until=${until.toISOString()}`);
+  }
 };
 
 export const unsnoozeEmail = async (id: string): Promise<void> => {
-  await api.post(`/emails/${id}/unsnooze`);
+  await api.patch(`/emails/${id}/unsnooze`);
 };
 
 export const formatFileSize = (bytes?: number): string => {
