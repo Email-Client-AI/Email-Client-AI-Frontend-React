@@ -60,6 +60,11 @@ export const getVisibleStatuses = async (): Promise<Status[]> => {
   return res.data;
 };
 
+export const getAllStatuses = async (): Promise<Status[]> => {
+  const res = await api.get<Status[]>("/statuses/all");
+  return res.data;
+};
+
 export const getEmailsByStatus = async (statusId: number): Promise<Email[]> => {
   const res = await api.get<Email[]>(`/emails/all?statusId=${statusId}`);
   return res.data;
