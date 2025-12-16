@@ -1,5 +1,5 @@
 import api from "../libs/axios";
-import type { CategoryType, Email, EmailPageResponse, SendEmailRequest, Thread, Suggestion } from "../types/email";
+import type { CategoryType, Email, EmailPageResponse, SendEmailRequest, Thread, Suggestion, Status } from "../types/email";
 
 export const getListEmails = async (
   page: number = 1,
@@ -13,9 +13,9 @@ export const getListEmails = async (
 };
 
 export const getAllEmails = async (category: CategoryType): Promise<Email[]> => {
-    if (['todo', 'inprogress', 'done', 'snoozed', 'removed'].includes(category)) {
-        return getEmailsByStatus(category);
-    }
+    // Note: This logic might need adjustment if 'category' is used for statuses too.
+    // For dynamic statuses, we should use getEmailsByStatus with ID.
+    // Keeping this for backward compatibility or standard categories.
     const res = await api.get<Email[]>(`/emails/all?category=${category.toUpperCase()}`);
     return res.data;
 };
@@ -53,13 +53,42 @@ export const sendEmail = async (payload: SendEmailRequest): Promise<void> => {
   await api.post("/emails/send", payload);
 };
 
-export const getEmailsByStatus = async (status: string): Promise<Email[]> => {
-  const res = await api.get<Email[]>(`/emails/all?status=${status.toUpperCase()}`);
+// --- Status Management Services ---
+
+export const getVisibleStatuses = async (): Promise<Status[]> => {
+  const res = await api.get<Status[]>("/statuses/all-visible");
   return res.data;
 };
 
-export const updateEmailStatus = async (id: string, status: string): Promise<void> => {
-  await api.patch(`/emails/${id}/status/${status.toUpperCase()}`);
+export const getEmailsByStatus = async (statusId: number): Promise<Email[]> => {
+  const res = await api.get<Email[]>(`/emails/all?statusId=${statusId}`);
+  return res.data;
+};
+
+export const createStatus = async (name: string, orderIndex: number): Promise<Status> => {
+  const res = await api.post<Status>("/statuses/create", null, {
+    params: { name, orderIndex }
+  });
+  return res.data;
+};
+
+export const updateStatus = async (id: number, name: string): Promise<void> => {
+  await api.put(`/statuses/update`, null, {
+    params: { id, name }
+  });
+};
+
+export const deleteStatus = async (deletedId: number, moveToId: number): Promise<void> => {
+  await api.delete(`/statuses/delete`, {
+    params: { deletedId, moveToId }
+  });
+};
+
+// ----------------------------------
+
+export const updateEmailStatus = async (id: string, statusId: number): Promise<void> => {
+    // Assuming backend now accepts statusId for update
+  await api.patch(`/emails/${id}/status/${statusId}`);
 };
 
 export const snoozeEmail = async (id: string, until?: Date): Promise<void> => {
