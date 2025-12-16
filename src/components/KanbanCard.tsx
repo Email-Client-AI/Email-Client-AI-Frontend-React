@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import type { Email } from "../types/email";
-import { formatReceivedDate } from "../services/email-services";
-import { useNavigate } from "react-router-dom";
+import { formatReceivedDate, summarizeEmail } from "../services/email-services";
 
 interface KanbanCardProps {
     email: Email;
@@ -11,11 +10,37 @@ interface KanbanCardProps {
 
 const KanbanCard: React.FC<KanbanCardProps> = ({ email, onRemove, onSnooze }) => {
     const [showSummary, setShowSummary] = useState(false);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-    const navigate = useNavigate();
 
     const handleOpenEmail = () => {
-        navigate(`/dashboard#inbox`, { state: { emailId: email.id } });
+        // Construct Gmail link
+        // Using threadId or gmailEmailId. Usually opening by threadId is safer for context.
+        // Format: https://mail.google.com/mail/u/0/#inbox/threadId
+        const gmailLink = `https://mail.google.com/mail/u/0/#inbox/${email.threadId}`;
+        window.open(gmailLink, "_blank");
+    };
+
+    const handleSummarize = async () => {
+        if (showSummary) {
+            setShowSummary(false);
+            return;
+        }
+
+        setShowSummary(true);
+        if (!summary) {
+            setLoadingSummary(true);
+            try {
+                const result = await summarizeEmail(email.threadId);
+                setSummary(result);
+            } catch (error) {
+                console.error("Failed to summarize email", error);
+                setSummary("Failed to load summary.");
+            } finally {
+                setLoadingSummary(false);
+            }
+        }
     };
 
     return (
@@ -80,18 +105,25 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ email, onRemove, onSnooze }) =>
             {/* Summary Section */}
             {showSummary && (
                 <div className="mb-3 rounded bg-blue-50 p-2 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                    <strong>AI Summary:</strong> This email has a short content. It seems to be a reply email with two attachments.
+                    {loadingSummary ? (
+                        <span className="flex items-center gap-2">
+                            <span className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></span>
+                            Generating summary...
+                        </span>
+                    ) : (
+                        <strong>AI Summary: {summary}</strong>
+                    )}
                 </div>
             )}
 
             {/* Footer Actions */}
             <div className="flex items-center justify-between gap-2">
                 <button
-                    onClick={() => setShowSummary(!showSummary)}
+                    onClick={handleSummarize}
                     className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 >
                     <span className="material-icons-outlined text-[16px]">auto_awesome</span>
-                    Summarize
+                    {showSummary ? "Hide Summary" : "Summarize"}
                 </button>
                 <button
                     onClick={handleOpenEmail}
