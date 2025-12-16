@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { EmailStatus, CategoryType, type Email, type Thread } from "../types/email";
+import { type Email, type Thread, type Status } from "../types/email";
 import {
-    getListEmails,
+    getVisibleStatuses,
     getEmailsByStatus,
     updateEmailStatus,
     snoozeEmail,
     groupEmailsByThread,
     getAllEmailsByThread,
+    createStatus,
+    updateStatus,
+    deleteStatus,
 } from "../services/email-services";
 import KanbanColumn from "../components/KanbanColumn";
 import SnoozeModal from "../components/SnoozeModal";
@@ -15,23 +18,22 @@ import { ComposeProvider } from "../contexts/ComposeContext";
 import ComposeModal from "../components/ComposeModal";
 import EmailList from "../components/EmailList";
 import EmailDetail from "../components/EmailDetail";
+import { RenameStatusModal, DeleteStatusModal } from "../components/StatusModals";
 
 const ITEMS_PER_PAGE = 10;
 
 const KanbanBoard: React.FC = () => {
     // Kanban State
-    const [columns, setColumns] = useState<{
-        [key: string]: Email[];
-    }>({
-        inbox: [],
-        todo: [],
-        inprogress: [],
-        done: [],
-    });
-
+    const [statuses, setStatuses] = useState<Status[]>([]);
+    const [columns, setColumns] = useState<{ [key: number]: Email[] }>({});
     const [isLoading, setIsLoading] = useState(true);
     const [snoozeModalOpen, setSnoozeModalOpen] = useState(false);
     const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+
+    // Modal States
+    const [renameModalOpen, setRenameModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
 
     // Search / Dashboard State
     const [isSearchActive, setIsSearchActive] = useState(false);
@@ -42,26 +44,22 @@ const KanbanBoard: React.FC = () => {
     const fetchBoardData = async () => {
         setIsLoading(true);
         try {
-            // Fetch all columns in parallel
-            const [inboxRes, todoRes, inprogressRes, doneRes] = await Promise.all([
-                getListEmails(1, 50, CategoryType.INBOX), // Fetch first 50 from Inbox
-                getEmailsByStatus(EmailStatus.TODO),
-                getEmailsByStatus(EmailStatus.INPROGRESS),
-                getEmailsByStatus(EmailStatus.DONE),
-            ]);
+            // 1. Fetch Statuses
+            const fetchedStatuses = await getVisibleStatuses();
+            // Sort by orderIndex
+            fetchedStatuses.sort((a, b) => a.orderIndex - b.orderIndex);
+            setStatuses(fetchedStatuses);
 
-            // Filter Inbox to exclude emails that might have a status (if backend doesn't do it automatically)
-            // For now, assuming getListEmails(INBOX) returns emails that are effectively in the inbox state
-            // but we might want to filter out those that have a status set if the backend includes them.
-            // Let's assume the backend handles it, or we filter client side:
-            const inboxEmails = inboxRes.emails.filter(e => !e.status || (e.status as string) === 'inbox');
+            // 2. Fetch Emails for each status
+            const columnData: { [key: number]: Email[] } = {};
+            await Promise.all(
+                fetchedStatuses.map(async (status) => {
+                    const emails = await getEmailsByStatus(status.id);
+                    columnData[status.id] = emails;
+                })
+            );
+            setColumns(columnData);
 
-            setColumns({
-                inbox: inboxEmails,
-                todo: todoRes,
-                inprogress: inprogressRes,
-                done: doneRes,
-            });
         } catch (error) {
             console.error("Failed to fetch Kanban board data", error);
         } finally {
@@ -73,47 +71,52 @@ const KanbanBoard: React.FC = () => {
         fetchBoardData();
     }, []);
 
-    const handleDrop = async (e: React.DragEvent, targetStatus: EmailStatus | "inbox") => {
+    const handleDrop = async (e: React.DragEvent, targetStatusId: number) => {
         const emailId = e.dataTransfer.getData("emailId");
         if (!emailId) return;
 
         // Find source column and email
-        let sourceColumn = "";
+        let sourceStatusId = -1;
         let emailToMove: Email | undefined;
 
-        for (const [colKey, emails] of Object.entries(columns)) {
+        for (const [statusIdStr, emails] of Object.entries(columns)) {
+            const statusId = Number(statusIdStr);
             const found = emails.find((e) => e.id === emailId);
             if (found) {
-                sourceColumn = colKey;
+                sourceStatusId = statusId;
                 emailToMove = found;
                 break;
             }
         }
 
-        if (!emailToMove || sourceColumn === targetStatus) return;
+        if (!emailToMove || sourceStatusId === targetStatusId) return;
 
         // Optimistic Update
         const newColumns = { ...columns };
 
         // Remove from source
-        newColumns[sourceColumn] = newColumns[sourceColumn].filter((e) => e.id !== emailId);
+        newColumns[sourceStatusId] = newColumns[sourceStatusId].filter((e) => e.id !== emailId);
 
         // Add to target
         // We need to update the email object's status as well for consistency
+        // Note: We don't have the full Status object for the target here easily without looking it up,
+        // but for the UI list we just need the email in the right array.
+        // If we need the status object on the email, we should find it from `statuses`.
+        const targetStatusObj = statuses.find(s => s.id === targetStatusId);
+
         const updatedEmail = {
             ...emailToMove,
-            status: targetStatus === "inbox" ? undefined : (targetStatus as EmailStatus)
+            status: targetStatusObj
         };
-        newColumns[targetStatus] = [updatedEmail, ...newColumns[targetStatus]];
+        newColumns[targetStatusId] = [updatedEmail, ...newColumns[targetStatusId]];
 
         setColumns(newColumns);
 
         // API Call
         try {
-            await updateEmailStatus(emailId, targetStatus);
+            await updateEmailStatus(emailId, targetStatusId);
         } catch (error) {
             console.error("Failed to update status", error);
-            // Revert on failure (could be improved with more robust rollback)
             fetchBoardData();
         }
     };
@@ -122,12 +125,28 @@ const KanbanBoard: React.FC = () => {
         // Optimistic remove
         const newColumns = { ...columns };
         for (const key in newColumns) {
-            newColumns[key] = newColumns[key].filter((e) => e.id !== id);
+            const statusId = Number(key);
+            newColumns[statusId] = newColumns[statusId].filter((e) => e.id !== id);
         }
         setColumns(newColumns);
 
         try {
-            await updateEmailStatus(id, EmailStatus.REMOVED);
+            // Assuming we have a 'Removed' status or endpoint. 
+            // If dynamic statuses don't include 'Removed', we might need a specific ID or endpoint.
+            // For now, let's assume there's a status for it or we use a special ID if the backend supports it.
+            // If the backend requires a status ID, we need to know the ID of "Removed" status.
+            // Or maybe use a specific endpoint for "trash".
+            // Let's assume there is a status named "Removed" or similar if we want to move it there.
+            // OR if the requirement is just to remove from board (archive/trash).
+            // Based on previous code: await updateEmailStatus(id, EmailStatus.REMOVED);
+            // We might need to find the "Removed" status ID.
+            const removedStatus = statuses.find(s => s.name.toLowerCase() === 'removed' || s.name.toLowerCase() === 'trash');
+            if (removedStatus) {
+                await updateEmailStatus(id, removedStatus.id);
+            } else {
+                console.warn("No 'Removed' status found to move email to.");
+            }
+
         } catch (error) {
             console.error("Failed to remove email", error);
             fetchBoardData();
@@ -145,7 +164,8 @@ const KanbanBoard: React.FC = () => {
         // Optimistic remove from board
         const newColumns = { ...columns };
         for (const key in newColumns) {
-            newColumns[key] = newColumns[key].filter((e) => e.id !== selectedEmailId);
+            const statusId = Number(key);
+            newColumns[statusId] = newColumns[statusId].filter((e) => e.id !== selectedEmailId);
         }
         setColumns(newColumns);
 
@@ -156,6 +176,59 @@ const KanbanBoard: React.FC = () => {
             fetchBoardData();
         }
     };
+
+    // --- Status Management ---
+
+    const handleCreateStatus = async (baseStatus: Status, position: 'left' | 'right') => {
+        const newOrderIndex = position === 'left' ? baseStatus.orderIndex : baseStatus.orderIndex + 1;
+
+        try {
+            await createStatus("New Column", newOrderIndex);
+            await fetchBoardData();
+        } catch (error) {
+            console.error("Failed to create status", error);
+        }
+    };
+
+
+
+
+    const handleRenameStatus = async (newName: string) => {
+        if (!selectedStatus) return;
+        try {
+            await updateStatus(selectedStatus.id, newName);
+            setStatuses(prev => prev.map(s => s.id === selectedStatus.id ? { ...s, name: newName } : s));
+        } catch (error) {
+            console.error("Failed to rename status", error);
+        }
+    };
+
+    const handleDeleteStatus = async (moveToId: number) => {
+        if (!selectedStatus) return;
+        try {
+            await deleteStatus(selectedStatus.id, moveToId);
+            await fetchBoardData();
+
+
+            // Move emails locally
+            // const emailsToMove = columns[selectedStatus.id] || [];
+            // setColumns(prev => {
+            //     const next = { ...prev };
+            //     delete next[selectedStatus.id];
+            //     if (next[moveToId]) {
+            //         next[moveToId] = [...next[moveToId], ...emailsToMove];
+            //     }
+            //     return next;
+            // });
+
+            // setStatuses(prev => prev.filter(s => s.id !== selectedStatus.id));
+
+        } catch (error) {
+            console.error("Failed to delete status", error);
+            // fetchBoardData(); // Revert/Refresh
+        }
+    };
+
 
     // --- Search Logic ---
 
@@ -233,38 +306,26 @@ const KanbanBoard: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                    <KanbanColumn
-                                        title="Inbox"
-                                        status="inbox"
-                                        emails={columns.inbox}
-                                        onDrop={handleDrop}
-                                        onRemove={handleRemove}
-                                        onSnooze={openSnoozeModal}
-                                    />
-                                    <KanbanColumn
-                                        title="To Do"
-                                        status={EmailStatus.TODO}
-                                        emails={columns.todo}
-                                        onDrop={handleDrop}
-                                        onRemove={handleRemove}
-                                        onSnooze={openSnoozeModal}
-                                    />
-                                    <KanbanColumn
-                                        title="In Progress"
-                                        status={EmailStatus.INPROGRESS}
-                                        emails={columns.inprogress}
-                                        onDrop={handleDrop}
-                                        onRemove={handleRemove}
-                                        onSnooze={openSnoozeModal}
-                                    />
-                                    <KanbanColumn
-                                        title="Done"
-                                        status={EmailStatus.DONE}
-                                        emails={columns.done}
-                                        onDrop={handleDrop}
-                                        onRemove={handleRemove}
-                                        onSnooze={openSnoozeModal}
-                                    />
+                                    {statuses.map((status) => (
+                                        <KanbanColumn
+                                            key={status.id}
+                                            status={status}
+                                            emails={columns[status.id] || []}
+                                            onDrop={handleDrop}
+                                            onRemove={handleRemove}
+                                            onSnooze={openSnoozeModal}
+                                            onInsertLeft={() => handleCreateStatus(status, 'left')}
+                                            onInsertRight={() => handleCreateStatus(status, 'right')}
+                                            onRename={() => {
+                                                setSelectedStatus(status);
+                                                setRenameModalOpen(true);
+                                            }}
+                                            onDelete={() => {
+                                                setSelectedStatus(status);
+                                                setDeleteModalOpen(true);
+                                            }}
+                                        />
+                                    ))}
                                 </>
                             )}
                         </div>
@@ -278,6 +339,22 @@ const KanbanBoard: React.FC = () => {
                 />
 
                 <ComposeModal />
+
+                {/* Status Management Modals */}
+                <RenameStatusModal
+                    isOpen={renameModalOpen}
+                    onClose={() => setRenameModalOpen(false)}
+                    onConfirm={handleRenameStatus}
+                    initialName={selectedStatus?.name || ""}
+                />
+
+                <DeleteStatusModal
+                    isOpen={deleteModalOpen}
+                    onClose={() => setDeleteModalOpen(false)}
+                    onConfirm={handleDeleteStatus}
+                    statuses={statuses}
+                    statusToDeleteId={selectedStatus?.id || -1}
+                />
             </div>
         </ComposeProvider>
     );

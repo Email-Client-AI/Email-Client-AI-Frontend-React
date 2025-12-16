@@ -1,3 +1,9 @@
+export interface Status {
+  id: number;
+  name: string;
+  orderIndex: number;
+}
+
 export interface Email {
   id: string;
   gmailEmailId: string;
@@ -12,7 +18,7 @@ export interface Email {
   recipientEmails: string[];
   labels: string[];
   attachments: EmailAttachment[];
-  status?: EmailStatus;
+  status?: Status;
 }
 
 export const EmailStatus = {

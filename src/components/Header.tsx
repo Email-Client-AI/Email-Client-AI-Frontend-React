@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useCompose } from "../contexts/ComposeContext";
 import { suggestEmails, searchEmails } from "../services/email-services";
 import type { Suggestion, Email } from "../types/email";
+import SnoozedEmailsModal from "./SnoozedEmailsModal";
 
 interface HeaderProps {
   activeCategory: string;
@@ -19,6 +20,9 @@ const Header: React.FC<HeaderProps> = ({ activeCategory, onSearch }) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Snoozed Modal State
+  const [snoozedModalOpen, setSnoozedModalOpen] = useState(false);
 
   // Close search suggestions when clicking outside
   useEffect(() => {
@@ -110,96 +114,109 @@ const Header: React.FC<HeaderProps> = ({ activeCategory, onSearch }) => {
 
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-background-light px-6 dark:border-gray-800 dark:bg-background-dark">
-      <div className="flex items-center space-x-8">
-        <div className="flex items-center space-x-2 text-lg font-bold text-gray-900 dark:text-gray-100">
-          <span className="material-icons-outlined text-primary">mail</span>
-          <span>Mail</span>
-        </div>
+    <>
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-background-light px-6 dark:border-gray-800 dark:bg-background-dark">
+        <div className="flex items-center space-x-8">
+          <div className="flex items-center space-x-2 text-lg font-bold text-gray-900 dark:text-gray-100">
+            <span className="material-icons-outlined text-primary">mail</span>
+            <span>Mail</span>
+          </div>
 
-        {/* CATEGORY NAV */}
-        <nav className="hidden items-center space-x-6 text-sm font-medium text-gray-500 dark:text-gray-400 md:flex">
-          {categories.map((cat) => (
-            <a
-              key={cat.id}
-              href={cat.id === "kanban" ? "/kanban" : `/dashboard#${cat.id}`}
-              className={
-                activeCategory === cat.id
-                  ? "text-primary font-semibold"
-                  : "hover:text-primary"
-              }
-            >
-              {cat.label}
-            </a>
-          ))}
-        </nav>
-      </div>
-
-      <div className="flex items-center space-x-4">
-        {/* Search */}
-        <div className="relative w-[28rem]" ref={searchRef}>
-          <span className="material-icons-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            search
-          </span>
-          <input
-            className="w-full rounded-md border-gray-300 bg-gray-100 py-2 pl-10 pr-4 text-sm focus:border-primary focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-            placeholder="Search"
-            type="text"
-            value={searchQuery}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
-              if (searchQuery.trim().length > 0) setShowSuggestions(true);
-            }}
-          />
-
-          {/* Suggestions Dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                  onClick={() => executeSearch(suggestion.text)}
-                >
-                  <span className="material-icons-outlined text-gray-400 text-xs">
-                    {suggestion.type === 'history' ? 'history' : 'search'}
-                  </span>
-                  <span>{suggestion.text}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => openCompose()}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-          Compose
-        </button>
-
-        {/* Avatar + Dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <img
-            alt="User avatar"
-            onClick={() => setOpen(!open)}
-            className="h-8 w-8 cursor-pointer rounded-full bg-gray-200 dark:bg-gray-700"
-            src="https://www.gravatar.com/avatar/?d=mp"
-          />
-
-          {open && (
-            <div className="absolute right-0 mt-2 w-36 rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 z-50">
-              <button
-                onClick={handleLogout}
-                className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+          {/* CATEGORY NAV */}
+          <nav className="hidden items-center space-x-6 text-sm font-medium text-gray-500 dark:text-gray-400 md:flex">
+            {categories.map((cat) => (
+              <a
+                key={cat.id}
+                href={cat.id === "kanban" ? "/kanban" : cat.id === "snoozed" ? "#" : `/dashboard#${cat.id}`}
+                onClick={(e) => {
+                  if (cat.id === "snoozed") {
+                    e.preventDefault();
+                    setSnoozedModalOpen(true);
+                  }
+                }}
+                className={
+                  activeCategory === cat.id
+                    ? "text-primary font-semibold"
+                    : "hover:text-primary"
+                }
               >
-                Logout
-              </button>
-            </div>
-          )}
+                {cat.label}
+              </a>
+            ))}
+          </nav>
         </div>
-      </div>
-    </header>
+
+        <div className="flex items-center space-x-4">
+          {/* Search */}
+          <div className="relative w-[28rem]" ref={searchRef}>
+            <span className="material-icons-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              search
+            </span>
+            <input
+              className="w-full rounded-md border-gray-300 bg-gray-100 py-2 pl-10 pr-4 text-sm focus:border-primary focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              placeholder="Search"
+              type="text"
+              value={searchQuery}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (searchQuery.trim().length > 0) setShowSuggestions(true);
+              }}
+            />
+
+            {/* Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    onClick={() => executeSearch(suggestion.text)}
+                  >
+                    <span className="material-icons-outlined text-gray-400 text-xs">
+                      {suggestion.type === 'history' ? 'history' : 'search'}
+                    </span>
+                    <span>{suggestion.text}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => openCompose()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+            Compose
+          </button>
+
+          {/* Avatar + Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <img
+              alt="User avatar"
+              onClick={() => setOpen(!open)}
+              className="h-8 w-8 cursor-pointer rounded-full bg-gray-200 dark:bg-gray-700"
+              src="https://www.gravatar.com/avatar/?d=mp"
+            />
+
+            {open && (
+              <div className="absolute right-0 mt-2 w-36 rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 z-50">
+                <button
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <SnoozedEmailsModal
+        isOpen={snoozedModalOpen}
+        onClose={() => setSnoozedModalOpen(false)}
+      />
+    </>
   );
 };
 
