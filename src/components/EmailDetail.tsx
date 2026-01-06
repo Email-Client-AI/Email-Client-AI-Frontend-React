@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { Thread, Email, EmailAttachment } from '../types/email';
+import type { Thread, Email } from '../types/email';
 import { formatFullDateTime, downloadAttachment, formatFileSize, summarizeEmail } from '../services/email-services';
 import { useCompose } from '../contexts/ComposeContext';
 import { toastService } from '../services/toast-services';

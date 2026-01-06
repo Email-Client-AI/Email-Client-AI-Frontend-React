@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Email } from "../types/email";
 import {
-    getVisibleStatuses,
     getEmailsByStatus,
     unsnoozeEmail,
     formatReceivedDate,

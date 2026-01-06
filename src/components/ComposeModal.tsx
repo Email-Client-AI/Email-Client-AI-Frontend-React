@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useCompose } from "../contexts/ComposeContext";
 import TiptapEditor from "./TipTapEditor";
 import { RecipientInput } from "./RecipientInput";
@@ -17,7 +17,6 @@ const ComposeModal: React.FC = () => {
     const [files, setFiles] = useState<File[]>([]);
     const [isSending, setIsSending] = useState(false);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const parseEmails = (emailString?: string): string[] => {
         if (!emailString) return [];
@@ -71,11 +70,6 @@ const ComposeModal: React.FC = () => {
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
-        }
-    };
 
     const removeFile = (index: number) => {
         setFiles((prev) => prev.filter((_, i) => i !== index));
